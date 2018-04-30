@@ -54,7 +54,7 @@
  * For further information see: 
  * http://dsn.tm.uni-karlsruhe.de/english/Overhaul_NS-2.php
  */
- 
+#include <cstddef>
 #ifndef ns_mac_80211Ext_h
 #define ns_mac_80211Ext_h
 #include "marshall.h"
