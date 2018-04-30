@@ -88,9 +88,9 @@ Node instproc init args {
 	set nodetype_ [$ns_ get-nodetype]
 
 	$self mk-default-classifier
-
 	# XXX Eventually these two should also be converted to modules
 	set multiPath_ [$class set multiPath_]
+
 }
 
 # XXX This instproc is backward compatibility; when satellite node, mobile
@@ -350,8 +350,21 @@ Node instproc add-routes {id ifs} {
 			# 1. get new MultiPathClassifier,
 			# 2. migrate existing routes to that mclassifier
 			# 3. install the mclassifier in the node classifier_
-			#
+			#			
 			set mpathClsfr_($id) [new Classifier/MultiPath]
+			$mpathClsfr_($id) set nodeid_ [$self id]
+			set nodecolor_ [$self get-attribute "COLOR"]
+			set nodetype_ 0
+			if {$nodecolor_ == "green"} {
+				set nodetype_ 1
+			}
+			if {$nodecolor_ == "blue"} {
+				set nodetype_ 2
+			}
+			if {$nodecolor_ == "red"} {
+				set nodetype_ 3
+			}
+			$mpathClsfr_($id) set nodetype_ $nodetype_
 			if {$routes_($id) > 0} {
 				assert "$routes_($id) == 1"
 				$mpathClsfr_($id) installNext \

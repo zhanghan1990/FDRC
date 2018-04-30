@@ -61,6 +61,14 @@ struct hdr_ip {
 	ns_addr_t	dst_;
 	int		ttl_;
 
+	/* Mohammad: flag to indicate 
+	 * the last TCP ack for this flow 
+	 * had EcnEcho set. This is used by 
+	 * TBF to determin if flow should be 
+	 *paced. */
+	int             gotecnecho;
+	//abd
+
 	/* Monarch extn */
 // 	u_int16_t	sport_;
 // 	u_int16_t	dport_;
@@ -68,6 +76,7 @@ struct hdr_ip {
 	/* IPv6 */
 	int		fid_;	/* flow id */
 	int		prio_;
+	int 	prio_type_; //Shuang
 
 	static int offset_;
 	inline static int& offset() { return offset_; }
@@ -87,6 +96,7 @@ struct hdr_ip {
 	/* ipv6 fields */
 	int& flowid() { return (fid_); }
 	int& prio() { return (prio_); }
+	int& prio_type() {return (prio_type_); }
 };
 
 #endif
