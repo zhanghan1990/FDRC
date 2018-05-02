@@ -1,3 +1,8 @@
 pfabric.patch的使用方法：
 （1）将pfabric.patch拷贝到ns-2.34文件夹下
 （2）执行：patch -p1 < pfabric.patch 
+
+几个注意的地方：
+（1）去掉reset函数中对 deadline和flowremaining的设置，不然，deadline 会总重置为0，会影响使用
+
+（2）

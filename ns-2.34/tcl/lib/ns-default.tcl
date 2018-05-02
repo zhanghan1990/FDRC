@@ -1319,7 +1319,7 @@ if [TclObject is-class Agent/TCP/FullTcp] {
 	Agent/TCP/FullTcp set prio_cap5 1001*1460+15;
 	Agent/TCP/FullTcp set prio_cap6 2825*1460+15;
 	Agent/TCP/FullTcp set prob_cap_ 0; #Shuang: prob mode
-	Agent/TCP/FullTcp set deadline 0; #Shuang: deadline
+	Agent/TCP/FullTcp set deadline_ 0; #Shuang: deadline
 	Agent/TCP/FullTcp set early_terminated_ 0; #Shuang
 
 	Agent/TCP/FullTcp/Newreno set recov_maxburst_ 2; # max burst dur recov

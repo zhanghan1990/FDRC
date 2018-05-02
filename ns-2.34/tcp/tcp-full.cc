@@ -158,7 +158,7 @@ FullTcpAgent::delay_bind_init_all()
 	delay_bind_init_one("prio_cap4"); //Shuang
 	delay_bind_init_one("prio_cap5"); //Shuang
 	delay_bind_init_one("prio_cap6"); //Shuang
-	delay_bind_init_one("deadline"); //Shuang
+	delay_bind_init_one("deadline_"); //Shuang
 	delay_bind_init_one("early_terminated_"); //Shuang
 
 	TcpAgent::delay_bind_init_all();
@@ -202,9 +202,9 @@ FullTcpAgent::delay_bind_dispatch(const char *varName, const char *localName, Tc
 	if (delay_bind(varName, localName, "prio_cap5", &prio_cap_[5], tracer)) return TCL_OK; 
 	if (delay_bind(varName, localName, "prio_cap6", &prio_cap_[6], tracer)) return TCL_OK; 
 	if (delay_bind(varName, localName, "prob_cap_", &prob_cap_, tracer)) return TCL_OK; //Shuang
-	if (delay_bind(varName, localName, "deadline", &deadline, tracer)) return TCL_OK; //Shuang
+	if (delay_bind(varName, localName, "deadline_", &deadline, tracer)) return TCL_OK; //Shuang
 	if (delay_bind(varName, localName, "early_terminated_", &early_terminated_, tracer)) return TCL_OK; //Shuang
-        return TcpAgent::delay_bind_dispatch(varName, localName, tracer);
+    return TcpAgent::delay_bind_dispatch(varName, localName, tracer);
 }
 
 void
@@ -605,7 +605,7 @@ FullTcpAgent::reset()
 	rq_.clear();		// clear reassembly queue
 	rtt_init();		// zero rtt, srtt, backoff       
 	last_ack_sent_ = -1;
-	flow_remaining_ = -1; // Mohammad
+	//flow_remaining_ = -1; // Mohammad
 	rcv_nxt_ = -1;
 	pipe_ = 0;
 	rtxbytes_ = 0;
@@ -632,7 +632,7 @@ FullTcpAgent::reset()
 	prob_mode_ = false;
 	prob_count_ = 0;
 	last_sqtotal_ = 0;
-	deadline = 0;
+	//deadline = 0;
 	early_terminated_ = 0;
 }
 
@@ -3585,7 +3585,7 @@ MinTcpAgent::rtt_timeout() {
 
 void
 DDTcpAgent::slowdown(int how) {
-
+	//printf("deadline %.8lf start %.8lf deadline %d\n", now(), start_time, deadline);
 	double decrease;  /* added for highspeed - sylvia */
 	double win, halfwin, decreasewin;
 	int slowstart = 0;
