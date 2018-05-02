@@ -145,6 +145,11 @@ protected:
 			       set by TCL when starting a flow. Receiver will
 			       set immediate ACKs when nothing remains to
 			       notify sender of flow completion. */
+
+	/* Han: flow size initial
+	   Used in L2DCT and LPD
+	*/
+	int flow_size_;  /* Number of bytes of one flow*/
        
 	/* Mohammad: state-variable to inform 
 	 * pacer (TBF) of receiving ecnecho for the flow
@@ -174,7 +179,7 @@ protected:
                             // 2: Retry if SYN/ACK packet is ECN-marked.
 	int dsack_;	    // do DSACK as well as SACK?
 	double delack_interval_;
-        int debug_;                     // Turn on/off debug output
+    int debug_;                     // Turn on/off debug output
 
 	int headersize();   // a tcp header w/opts
 	int outflags();     // state-specific tcp header flags
@@ -330,6 +335,25 @@ public:
 //   virtual void advance_bytes(int nb);
 };
 
+class LLTcpAgent : public SackFullTcpAgent {
+
+	virtual void slowdown(int how);			/* reduce cwnd/ssthresh */
+	virtual int byterm();
+	virtual int foutput(int seqno, int reason = 0); // output 1 packet
+	virtual int need_send();    		// send ACK/win-update now?
+	virtual void opencwnd();
+	virtual void delay_bind_init_all();
+	virtual int delay_bind_dispatch(const char *varName, const char *localName, TclObject *tracer);
+
+
+	/* Han: Threshold for L2DCT*/
+
+	// LL_WIN,LL_MAX present wc minimum weight and maximum weight.
+	double LL_WCMIN,LL_WCMAX;
+	// LL_BMIN,LL_BMAX present bytes threshold.
+	double LL_BMIN,LL_BMAX;   
+};
+
 class DDTcpAgent : public SackFullTcpAgent {
 
 	virtual void slowdown(int how);			/* reduce cwnd/ssthresh */
@@ -338,5 +362,9 @@ class DDTcpAgent : public SackFullTcpAgent {
 	virtual int need_send();    		// send ACK/win-update now?
 
 };
+
+
+
+
 
 #endif

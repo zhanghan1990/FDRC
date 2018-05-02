@@ -7,9 +7,9 @@ set simulationTime 1.0
 
 set startMeasurementTime 1
 set stopMeasurementTime 2
-set flowClassifyTime 0.001
+set flowClassifyTime 0.1
 
-set sourceAlg DC-TCP-Sack
+set sourceAlg [lindex $argv 0]
 set switchAlg RED
 set lineRate 1Gb
 set inputLineRate 2Gb
@@ -19,8 +19,15 @@ set ackRatio 1
 set packetSize 1460
  
 set traceSamplingInterval 0.0001
-set throughputSamplingInterval 0.01
+set throughputSamplingInterval 0.1
 set enableNAM 0
+
+set filename $sourceAlg
+append filename "-out.tr"
+puts $filename
+
+set trace_file [open  $filename  w]
+
 
 set ns [new Simulator]
 
@@ -35,6 +42,15 @@ Agent/TCP set minrto_ 0.2 ; # minRTO = 200ms
 Agent/TCP set windowOption_ 0
 
 
+Agent/TCP/FullTcp/Sack/LLDCT set LL_WCMIN_ 0.125; #wc lower bound, recommended by the paper
+Agent/TCP/FullTcp/Sack/LLDCT set LL_WCMAX_ 2.5;   #wc upper bound, recommended by the paper
+
+Agent/TCP/FullTcp/Sack/LLDCT set LL_BMIN_ 5000000  ;#bytes lower bound, recommended by the paper,in bytes
+Agent/TCP/FullTcp/Sack/LLDCT set LL_BMAX_ 30000000 ;#bytes upper bound, recommended by the paper, in bytes
+
+
+
+
 if {[string compare $sourceAlg "DD-TCP-Sack"] == 0} {
     Agent/TCP set ecnhat_ true
     Agent/TCPSink set ecnhat_ true
@@ -42,6 +58,18 @@ if {[string compare $sourceAlg "DD-TCP-Sack"] == 0} {
     #Agent/TCP/FullTcp set deadline 100
     set myAgent "Agent/TCP/FullTcp/Sack/DDTCP";
 }
+
+if {[string compare $sourceAlg "LL-DCT-Sack"] == 0} {
+    Agent/TCP set ecnhat_ true
+    Agent/TCPSink set ecnhat_ true
+    Agent/TCP set ecnhat_g_ $DCTCP_g_;
+    #Agent/TCP/FullTcp set deadline 100
+    set myAgent "Agent/TCP/FullTcp/Sack/LLDCT";
+}
+
+
+
+
 
 
 if {[string compare $sourceAlg "DC-TCP-Sack"] == 0} {
@@ -220,6 +248,14 @@ for {set i 0} {$i < $N} {incr i} {
         $sink($i) listen
     }
 
+    if {[string compare $sourceAlg "LL-DCT-Sack"] == 0} { 
+      set tcp($i) [new Agent/TCP/FullTcp/Sack/LLDCT]
+      set sink($i) [new Agent/TCP/FullTcp/Sack/LLDCT]
+      $sink($i) listen
+    }
+
+
+
 
 
 
@@ -233,10 +269,10 @@ for {set i 0} {$i < $N} {incr i} {
     $ns connect $tcp($i) $sink($i)       
 }
 
+$ns  trace-queue  $nqueue $nclient  $trace_file
 
-
-$ns at $traceSamplingInterval "myTrace $mytracefile"
-$ns at $throughputSamplingInterval "throughputTrace $throughputfile"
+# $ns at $traceSamplingInterval "myTrace $mytracefile"
+# $ns at $throughputSamplingInterval "throughputTrace $throughputfile"
 
 set ru [new RandomVariable/Uniform]
 $ru set min_ 0
@@ -246,17 +282,19 @@ $ru set max_ 1.0
 #     $ns at 0.0 "$tcp($i) advance-bytes 25000000" 
 #     #$ns at 0.0 "$tcp($i) get-flow 10000000" 
 # }
-$ns at 0.0 "$tcp(0) advance-bytes 5000000" 
-$ns at 0.0 "$tcp(1) advance-bytes 10000000" 
-$ns at 0.0 "$tcp(2) advance-bytes 15000000" 
-$ns at 0.0 "$tcp(3) advance-bytes 20000000" 
-$ns at 0.0 "$tcp(4) advance-bytes 30000000" 
 
+
+
+$ns at 0.0 "$tcp(0) advance-bytes 15000000" 
+$ns at 0.0 "$tcp(1) advance-bytes 20000000" 
+$ns at 0.0 "$tcp(2) advance-bytes 30000000" 
+$ns at 0.1 "$tcp(3) advance-bytes 5000000" 
+$ns at 0.1 "$tcp(4) advance-bytes 10000000" 
 
 #deadline in us
 #flow1: 150 ms，flow2: 300ms 
-$tcp(0) set deadline_ 150000
-$tcp(1) set deadline_ 300000 
+$tcp(3) set deadline_ 150000
+$tcp(4) set deadline_ 300000 
 
 set flowmon [$ns makeflowmon Fid]
 set MainLink [$ns link $nqueue $nclient]
@@ -265,15 +303,15 @@ $ns attach-fmon $MainLink $flowmon
 
 set fcl [$flowmon classifier]
 
-$ns at $flowClassifyTime "classifyFlows"
+# $ns at $flowClassifyTime "classifyFlows"
 
-proc classifyFlows {} {
-    global N fcl flowstats
-    puts "NOW CLASSIFYING FLOWS"
-    for {set i 0} {$i < $N} {incr i} {
-	    set flowstats($i) [$fcl lookup autp 0 0 $i]
-    }
-} 
+# proc classifyFlows {} {
+#     global N fcl flowstats
+#     puts "NOW CLASSIFYING FLOWS"
+#     for {set i 0} {$i < $N} {incr i} {
+# 	    set flowstats($i) [$fcl lookup autp 0 0 $i]
+#     }
+# } 
 
 
 set startPacketCount 0

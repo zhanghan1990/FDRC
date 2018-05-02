@@ -1308,6 +1308,7 @@ if [TclObject is-class Agent/TCP/FullTcp] {
         Agent/TCP/FullTcp set ecn_syn_wait_ 0; # Wait after marked SYN/ACK? 
         Agent/TCP/FullTcp set debug_ false;  # Added Sept. 16, 2007.
 	Agent/TCP/FullTcp set flow_remaining_ -1; #Mohammad: added for robust FCT measurement
+	Agent/TCP/FullTcp set flow_size_ 0; #Han: added for init flow transfer at first
 	Agent/TCP/FullTcp set dynamic_dupack_ 0; # Mohammad: if non-zero, set dupack threshold to max(3, dynamic_dupack_ * cwnd_)
 	Agent/TCP/FullTcp set prio_scheme_ 2; #Shuang: priority scheme
 	Agent/TCP/FullTcp set prio_num_ 0; #Shuang: number of priority
@@ -1331,6 +1332,14 @@ if [TclObject is-class Agent/TCP/FullTcp] {
 	Agent/TCP/FullTcp/Sack set sack_rtx_cthresh_ 1; # dup cnt to trigger rtx
 	Agent/TCP/FullTcp/Sack set sack_rtx_bthresh_ 1; # dup bcnt to trigger rtx
 	Agent/TCP/FullTcp/Sack set sack_rtx_threshmode_ 1; # 1 = cnt only
+
+	Agent/TCP/FullTcp/Sack/LLDCT set LL_WCMIN_ 0.125; #wc lower bound, recommended by the paper
+	Agent/TCP/FullTcp/Sack/LLDCT set LL_WCMAX_ 2.5;   #wc upper bound, recommended by the paper
+
+	Agent/TCP/FullTcp/Sack/LLDCT set LL_BMIN_ 250000  ;#bytes lower bound, recommended by the paper,in bytes
+	Agent/TCP/FullTcp/Sack/LLDCT set LL_BMAX_ 1000000 ;#bytes upper bound, recommended by the paper, in bytes
+
+
 
 	Agent/TCP/FullTcp/Tahoe instproc init {} {
 		$self next
@@ -1356,6 +1365,10 @@ if [TclObject is-class Agent/TCP/FullTcp] {
 	}
 
 	Agent/TCP/FullTcp/Sack/DDTCP instproc init {} {
+		$self next
+	}
+
+	Agent/TCP/FullTcp/Sack/LLDCT instproc init {} {
 		$self next
 	}
 

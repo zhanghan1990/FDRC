@@ -117,6 +117,16 @@ public:
 	}
 } class_dd_full;
 
+static class LLTcpClass : public TclClass {
+public:
+	LLTcpClass() : TclClass("Agent/TCP/FullTcp/Sack/LLDCT") {}
+	TclObject* create(int, const char*const*) {
+		return (new LLTcpAgent());
+	}
+} class_ll_full;
+
+
+
 /*
  * Delayed-binding variable linkage
  */
@@ -148,6 +158,8 @@ FullTcpAgent::delay_bind_init_all()
 	
 	delay_bind_init_one("flow_remaining_"); //Mohammad
 	delay_bind_init_one("dynamic_dupack_");
+
+	delay_bind_init_one("flow_size_"); // Han
 
 	delay_bind_init_one("prio_scheme_"); // Shuang
 	delay_bind_init_one("prio_num_"); //Shuang
@@ -192,6 +204,7 @@ FullTcpAgent::delay_bind_dispatch(const char *varName, const char *localName, Tc
         if (delay_bind_bool(varName, localName, "debug_", &debug_, tracer)) return TCL_OK;
 	if (delay_bind(varName, localName, "flow_remaining_", &flow_remaining_, tracer)) return TCL_OK; // Mohammad
 	if (delay_bind(varName, localName, "dynamic_dupack_", &dynamic_dupack_, tracer)) return TCL_OK; // Mohammad
+		if (delay_bind(varName, localName, "flow_size_", &flow_size_, tracer)) return TCL_OK; // Mohammad
 	if (delay_bind(varName, localName, "prio_scheme_", &prio_scheme_, tracer)) return TCL_OK; // Shuang
 	if (delay_bind(varName, localName, "prio_num_", &prio_num_, tracer)) return TCL_OK; //Shuang
 	if (delay_bind(varName, localName, "prio_cap0", &prio_cap_[0], tracer)) return TCL_OK; 
@@ -329,6 +342,9 @@ FullTcpAgent::advanceby(int np)
 void
 FullTcpAgent::advance_bytes(int nb)
 {
+
+// Han: flow size should be set when init the flow in bytes
+	flow_size_ = nb;
 
 ////Shuang: hardcode
 	cwnd_ = initial_window();
@@ -3766,3 +3782,365 @@ DDTcpAgent::need_send() {
 	}
 	return SackFullTcpAgent::need_send();
 }
+
+
+void LLTcpAgent::opencwnd()
+{
+	double wc;
+    // change flow_size_ to KB;
+    double flowsent = ((double)(flow_size_-byterm()))/1024.0;
+    double remainsize = (double)(byterm()/1024.0);
+    //printf("LLDCT down flow size =%lf sent = %lf  remainsize=%lf\n",flow_size_/1024,flowsent,remainsize);
+    if(flowsent < LL_BMIN){
+     	wc = LL_WCMAX;
+     } else if(flowsent > LL_BMAX) {
+     	wc = LL_WCMIN;
+     } else {
+     	wc = LL_WCMAX-(flowsent-LL_BMIN)*(LL_WCMAX-LL_WCMIN)/(LL_BMAX-LL_BMIN);
+     }
+
+    // printf("penalty=%lf,wc=%lf,alpha=%lf\n",penalty,wc,ecnhat_alpha_);
+
+    double factor = wc/LL_WCMAX;
+   // printf("win+ wc=%lf,flowsent=%lf\n",wc,flowsent);
+
+	double increment;
+   // printf("factor =%lf\n",factor);
+	if (cwnd_ < ssthresh_) {
+		/* slow-start (exponential) */
+		if (ecnhat_enable_beta_)
+			cwnd_ += ecnhat_beta_ / cwnd_;
+		else{
+			//cwnd_ += increase_num_ / cwnd_;
+			cwnd_ += factor;
+	       	}
+	} else {
+		/* linear */
+		double f;
+		switch (wnd_option_) {
+		case 0:
+			if (++count_ >= cwnd_) {
+				count_ = 0;
+				cwnd_ += factor;
+			}
+			break;
+
+		case 1:
+			/* This is the standard algorithm. */
+			if (ecnhat_enable_beta_)
+				increment = ecnhat_beta_ / cwnd_;
+			else if (ecnhat_tcp_friendly_) {
+				ecnhat_tcp_friendly_increase_ = ((int(t_srtt_) >> T_SRTT_BITS)*tcp_tick_ / 0.0004);// * ((int(t_srtt_) >> T_SRTT_BITS)*tcp_tick_ / 0.0004);
+				//printf("increase_factor = %f, s_rtt = %f\n",  ecnhat_tcp_friendly_increase_, (int(t_srtt_) >> T_SRTT_BITS)*tcp_tick_);				
+				increment = ecnhat_tcp_friendly_increase_ / cwnd_;
+				//increment = increase_num_ / cwnd_;
+			}
+			else
+				increment = increase_num_ / cwnd_;
+
+			if ((last_cwnd_action_ == 0 ||
+			  last_cwnd_action_ == CWND_ACTION_TIMEOUT) 
+			  && max_ssthresh_ > 0) {
+				increment = limited_slow_start(cwnd_,
+				  max_ssthresh_, increment);
+			}
+			//printf("%f: target = %f cwnd = %f\n", Scheduler::instance().clock(), target_wnd, (double) cwnd_);
+			/*if (1) {
+				target_wnd += increment;
+				cwnd_ += (target_wnd - cwnd_)/2.0/cwnd_;
+				} else*/
+			cwnd_ += increment;
+			
+			break;
+
+		case 2:
+			/* These are window increase algorithms
+			 * for experimental purposes only. */
+			/* This is the Constant-Rate increase algorithm 
+                         *  from the 1991 paper by S. Floyd on "Connections  
+			 *  with Multiple Congested Gateways". 
+			 *  The window is increased by roughly 
+			 *  wnd_const_*RTT^2 packets per round-trip time.  */
+			f = (t_srtt_ >> T_SRTT_BITS) * tcp_tick_;
+			f *= f;
+			f *= wnd_const_;
+			/* f = wnd_const_ * RTT^2 */
+			f += fcnt_;
+			if (f > cwnd_) {
+				fcnt_ = 0;
+				++cwnd_;
+			} else
+				fcnt_ = f;
+			break;
+
+		case 3:
+			/* The window is increased by roughly 
+			 *  awnd_^2 * wnd_const_ packets per RTT,
+			 *  for awnd_ the average congestion window. */
+			f = awnd_;
+			f *= f;
+			f *= wnd_const_;
+			f += fcnt_;
+			if (f > cwnd_) {
+				fcnt_ = 0;
+				++cwnd_;
+			} else
+				fcnt_ = f;
+			break;
+
+                case 4:
+			/* The window is increased by roughly 
+			 *  awnd_ * wnd_const_ packets per RTT,
+			 *  for awnd_ the average congestion window. */
+                        f = awnd_;
+                        f *= wnd_const_;
+                        f += fcnt_;
+                        if (f > cwnd_) {
+                                fcnt_ = 0;
+                                ++cwnd_;
+                        } else
+                                fcnt_ = f;
+                        break;
+		case 5:
+			/* The window is increased by roughly wnd_const_*RTT 
+			 *  packets per round-trip time, as discussed in
+			 *  the 1992 paper by S. Floyd on "On Traffic 
+			 *  Phase Effects in Packet-Switched Gateways". */
+                        f = (t_srtt_ >> T_SRTT_BITS) * tcp_tick_;
+                        f *= wnd_const_;
+                        f += fcnt_;
+                        if (f > cwnd_) {
+                                fcnt_ = 0;
+                                ++cwnd_;
+                        } else
+                                fcnt_ = f;
+                        break;
+                case 6:
+                        /* binomial controls */ 
+                        cwnd_ += increase_num_ / (cwnd_*pow(cwnd_,k_parameter_));                
+                        break; 
+ 		case 8: 
+			/* high-speed TCP, RFC 3649 */
+			increment = increase_param();
+			if ((last_cwnd_action_ == 0 ||
+			  last_cwnd_action_ == CWND_ACTION_TIMEOUT) 
+			  && max_ssthresh_ > 0) {
+				increment = limited_slow_start(cwnd_,
+				  max_ssthresh_, increment);
+			}
+			cwnd_ += increment;
+                        break;
+		default:
+#ifdef notdef
+			/*XXX*/
+			error("illegal window option %d", wnd_option_);
+#endif
+			abort();
+		}
+	}
+	// if maxcwnd_ is set (nonzero), make it the cwnd limit
+	if (maxcwnd_ && (int(cwnd_) > maxcwnd_))
+		cwnd_ = maxcwnd_;
+
+	return;
+}
+
+
+void
+LLTcpAgent::slowdown(int how) {
+
+	double decrease;  /* added for highspeed - sylvia */
+	double win, halfwin, decreasewin;
+	int slowstart = 0;
+	++ncwndcuts_;
+	if (!(how & TCP_IDLE) && !(how & NO_OUTSTANDING_DATA)){
+		++ncwndcuts1_; 
+	}
+
+	//zhanghan: flowsize-aware
+	double penalty = ecnhat_alpha_;
+   
+	
+	//compute penalty 
+
+     double wc;
+     // change flow_size_ to KB;
+     double flowsent = ((double)(flow_size_-byterm()))/1024.0;
+     double remainsize = (double)(byterm()/1024.0);
+     //printf("LLDCT down flow size =%lf sent = %lf  remainsize=%lf\n",flow_size_/1024,flowsent,remainsize);
+     if(flowsent < LL_BMIN){
+     	wc = LL_WCMAX;
+     } else if(flowsent > LL_BMAX) {
+     	wc = LL_WCMIN;
+     } else {
+     	wc = LL_WCMAX-(flowsent-LL_BMIN)*(LL_WCMAX-LL_WCMIN)/(LL_BMAX-LL_BMIN);
+     }
+
+     penalty = pow(ecnhat_alpha_,wc);
+     //printf("flowsent=%lf wc=%lf, penalty=%lf\n",flowsent,wc,penalty);
+ ///    printf("penalty=%lf,wc=%lf,alpha=%lf\n",penalty,wc,ecnhat_alpha_);
+	//ecnhat_alpha_ = 0.07;
+	// we are in slowstart for sure if cwnd < ssthresh
+	if (cwnd_ < ssthresh_) 
+		slowstart = 1;
+        if (precision_reduce_) {
+		halfwin = windowd() / 2;
+                if (wnd_option_ == 6) {         
+                        /* binomial controls */
+                        decreasewin = windowd() - (1.0-decrease_num_)*pow(windowd(),l_parameter_);
+                } else if (wnd_option_ == 8 && (cwnd_ > low_window_)) { 
+                        /* experimental highspeed TCP */
+			decrease = decrease_param();
+			//if (decrease < 0.1) 
+			//	decrease = 0.1;
+			decrease_num_ = decrease;
+                        decreasewin = windowd() - (decrease * windowd());
+                } else {
+	 		decreasewin = decrease_num_ * windowd();
+		}
+		win = windowd();
+		//printf("decrease param = %f window = %f decwin = %f\n", decrease_num_, win, decreasewin);
+	} else  {
+		int temp;
+		temp = (int)(window() / 2);
+		halfwin = (double) temp;
+                if (wnd_option_ == 6) {
+                        /* binomial controls */
+                        temp = (int)(window() - (1.0-decrease_num_)*pow(window(),l_parameter_));
+                } else if ((wnd_option_ == 8) && (cwnd_ > low_window_)) { 
+                        /* experimental highspeed TCP */
+			decrease = decrease_param();
+			//if (decrease < 0.1)
+                        //       decrease = 0.1;		
+			decrease_num_ = decrease;
+                        temp = (int)(windowd() - (decrease * windowd()));
+                } else {
+ 			temp = (int)(decrease_num_ * window());
+		}
+		decreasewin = (double) temp;
+		win = (double) window();
+	}
+	if (how & CLOSE_SSTHRESH_HALF)
+		// For the first decrease, decrease by half
+		// even for non-standard values of decrease_num_.
+		if (first_decrease_ == 1 || slowstart ||
+			last_cwnd_action_ == CWND_ACTION_TIMEOUT) {
+			// Do we really want halfwin instead of decreasewin
+		// after a timeout?
+			ssthresh_ = (int) halfwin;
+		} else {
+			ssthresh_ = (int) decreasewin;
+		}
+	else if (how & CLOSE_SSTHRESH_ECNHAT) 
+		ssthresh_ = (int) ((1 - penalty) * windowd());
+	//ssthresh_ = (int) (windowd() - sqrt(2*windowd())/2.0);		
+        else if (how & THREE_QUARTER_SSTHRESH)
+		if (ssthresh_ < 3*cwnd_/4)
+			ssthresh_  = (int)(3*cwnd_/4);
+	if (how & CLOSE_CWND_HALF)
+		// For the first decrease, decrease by half
+		// even for non-standard values of decrease_num_.
+		if (first_decrease_ == 1 || slowstart || decrease_num_ == 0.5) {
+			cwnd_ = halfwin;
+		} else cwnd_ = decreasewin;
+        else if (how & CLOSE_CWND_ECNHAT) {
+		cwnd_ = (1 - penalty) * windowd();
+		if (cwnd_ < 1)
+			cwnd_ = 1;
+		}
+	//cwnd_ = windowd() - sqrt(2*windowd())/2.0;      
+	else if (how & CWND_HALF_WITH_MIN) {
+		// We have not thought about how non-standard TCPs, with
+		// non-standard values of decrease_num_, should respond
+		// after quiescent periods.
+                cwnd_ = decreasewin;
+                if (cwnd_ < 1)
+                        cwnd_ = 1;
+	}
+	else if (how & CLOSE_CWND_RESTART) 
+		cwnd_ = int(wnd_restart_);
+	else if (how & CLOSE_CWND_INIT) 	  
+	        cwnd_ = int(wnd_init_);
+	else if (how & CLOSE_CWND_ONE)
+		cwnd_ = 1;
+	else if (how & CLOSE_CWND_HALF_WAY) {
+		// cwnd_ = win - (win - W_used)/2 ;
+		cwnd_ = W_used + decrease_num_ * (win - W_used);
+                if (cwnd_ < 1)
+                        cwnd_ = 1;
+	}
+	if (ssthresh_ < 2)
+		ssthresh_ = 2;
+	if (cwnd_ < 1)
+		cwnd_ = 1; // Added by Mohammad
+	if (how & (CLOSE_CWND_HALF|CLOSE_CWND_RESTART|CLOSE_CWND_INIT|CLOSE_CWND_ONE|CLOSE_CWND_ECNHAT))
+		cong_action_ = TRUE;
+
+	fcnt_ = count_ = 0;
+	if (first_decrease_ == 1)
+		first_decrease_ = 0;
+	// for event tracing slow start
+	if (cwnd_ == 1 || slowstart) 
+		// Not sure if this is best way to capture slow_start
+		// This is probably tracing a superset of slowdowns of
+		// which all may not be slow_start's --Padma, 07/'01.
+		trace_event("SLOW_START");
+}
+
+int
+LLTcpAgent::byterm() {
+	return curseq_ - int(highest_ack_) - sq_.total();
+}
+
+int
+LLTcpAgent::foutput(int seqno, int reason) {
+	if (deadline != 0) {
+// 		double tleft = double(deadline)/1e6 - (now() - start_time) - byterm()*8/1e10;
+		double tleft = deadline/1e6 - (now() - start_time) - (curseq_ - int(maxseq_)) * 8/1e10;
+   		if (tleft < 0 && signal_on_empty_) {
+			early_terminated_ = 1;
+			bufferempty();
+			printf("early termination V2 now %.8lf start %.8lf deadline %d byterm %d tleft %.8f\n", now(), start_time, deadline, curseq_ - int(maxseq_), tleft);
+			fflush(stdout);
+			return 0;
+		} else if (tleft < 0) {
+			return 0;
+		}
+		//printf("test foutput\n");
+	}
+	return SackFullTcpAgent::foutput(seqno, reason);
+}
+
+int
+LLTcpAgent::need_send() {
+	if (deadline != 0) {
+ 		double tleft1 = deadline/1e6 - (now() - start_time);
+		if (tleft1 < 0)
+			return 0;
+		//printf("test need send\n");
+	}
+	return SackFullTcpAgent::need_send();
+}
+
+void
+LLTcpAgent::delay_bind_init_all()
+{
+	delay_bind_init_one("LL_WCMIN_"); // Han
+	delay_bind_init_one("LL_WCMAX_"); // Han
+	delay_bind_init_one("LL_BMIN_"); // Han
+	delay_bind_init_one("LL_BMAX_"); // Han
+	SackFullTcpAgent::delay_bind_init_all();
+}
+
+
+int LLTcpAgent::delay_bind_dispatch(const char *varName, const char *localName, TclObject *tracer){
+	if (delay_bind(varName, localName, "LL_WCMIN_", &LL_WCMIN, tracer)) return TCL_OK; // han 
+	if (delay_bind(varName, localName, "LL_WCMAX_", &LL_WCMAX, tracer)) return TCL_OK; // han 
+	if (delay_bind(varName, localName, "LL_BMIN_", &LL_BMIN, tracer)) return TCL_OK; // han 
+	if (delay_bind(varName, localName, "LL_BMAX_", &LL_BMAX, tracer)) return TCL_OK; // han 
+	return SackFullTcpAgent::delay_bind_dispatch(varName, localName, tracer);
+}
+
+
+
+
