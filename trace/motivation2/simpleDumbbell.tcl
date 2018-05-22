@@ -1,33 +1,106 @@
 source "tcp-common-opt.tcl"
-set N 6
-set B 250
-set K 20
-set RTT 0.0001
 
-set simulationTime 100.0
-
-set startMeasurementTime 1
-set stopMeasurementTime 2
-set flowClassifyTime 0.1
-
+# Choose methods that schedule the traffic
 set sourceAlg [lindex $argv 0]
-set switchAlg RED
+
+# Total Number of nodes that send traffic accoding to the distribution of traffic
+set N 5
+
+# Percentage of Flows that have deadline
+set DeadlinePercentage 0.1
+
+# Background flows (longlive flows)
+set BackgroundFlows 1
+
+# D2TCP:Deadline down threshold in us
+set deadline_down 30000 
+
+# D2TCP:Deadline up threshold in us
+set deadline_up   60000
+
+# wc lower bound, recommended by the paper
+Agent/TCP/FullTcp/Sack/LLDCT set LL_WCMIN_ 0.125;
+
+# wc upper bound, recommended by the paper
+Agent/TCP/FullTcp/Sack/LLDCT set LL_WCMAX_ 2.5;  
+
+# bytes lower bound, recommended by the paper,in KB
+Agent/TCP/FullTcp/Sack/LLDCT set LL_BMIN_ 2  ;
+
+# bytes upper bound, recommended by the paper, in KB
+Agent/TCP/FullTcp/Sack/LLDCT set LL_BMAX_ 200 ;
+
+
+
+# Total Number of flows that should sent according to the distribution of traffic
+set sim_end 5000
+
+# Compute the total number of flows that have deadline
+set DeadlineFlowsNumber [expr $sim_end* $DeadlinePercentage]
+set DeadlineFlowsPer [expr $sim_end/$DeadlineFlowsNumber]
+set DeadlineFlowsPer [expr int($DeadlineFlowsPer)]
+
+
+# Total number of simulation time
+set simulationTime 1000.0
+
+# Traffic load
+set load 0.2
+
+# Thtreshold of Switch (number of packets)
+set K 20
+
+# g in Server side
+set DCTCP_g_ 0.026
+
+
+# If trace the packest at the bottleneck link: 1 packetleve trace
+set TracePacketLevel 0
+
+
+# Bandwidth between switches (in Gbps)
 set lineRate 1
+
+
+# Bandwidth of servers that connect to net (in Gbps)
 set inputLineRate 2
 
-set DCTCP_g_ 0.026
+
+
+# Connection between nodes
+set connections_per_pair 8
+
+
+# Queue Limit (number of packets)
+set B 250
+
+
+# Flow Log for distribution traffic
+set flowlogname $sourceAlg-[expr int($DeadlinePercentage*10)]-flow.tr
+set flowlog [open $flowlogname w]
+
+# Set flow arrival rate
+set meanFlowSize [expr 1138*1460]
+set lambda [expr ($lineRate*$load*1000000000)/($meanFlowSize*8.0/1460*1500)]
+puts "Arrival: Poisson with inter-arrival [expr 1/$lambda * 1000] ms"
+
+
+
+set RTT 0.0001
+
+set switchAlg RED
+
 set ackRatio 1 
 set packetSize 1460
- 
-set traceSamplingInterval 0.0001
-set throughputSamplingInterval 0.1
-set enableNAM 0
+
+
 
 set filename $sourceAlg
 append filename "-out.tr"
-puts $filename
+
 
 set trace_file [open  $filename  w]
+
 
 
 set ns [new Simulator]
@@ -39,22 +112,9 @@ Agent/TCP/FullTcp set segsize_ $packetSize
 Agent/TCP set window_ 1256
 Agent/TCP set slow_start_restart_ false
 Agent/TCP set tcpTick_ 0.01
-Agent/TCP set minrto_ 0.2 ; # minRTO = 200ms
+Agent/TCP set minrto_ 0.2 ; 
 Agent/TCP set windowOption_ 0
 
-
-Agent/TCP/FullTcp/Sack/LLDCT set LL_WCMIN_ 0.125; #wc lower bound, recommended by the paper
-Agent/TCP/FullTcp/Sack/LLDCT set LL_WCMAX_ 2.5;   #wc upper bound, recommended by the paper
-
-Agent/TCP/FullTcp/Sack/LLDCT set LL_BMIN_ 2  ;#bytes lower bound, recommended by the paper,in KB
-Agent/TCP/FullTcp/Sack/LLDCT set LL_BMAX_ 200 ;#bytes upper bound, recommended by the paper, in KB
-
-
-# Set flow arrival rate
-set load 0.5
-set meanFlowSize [expr 1138*1460]
-set lambda [expr ($lineRate*$load*1000000000)/($meanFlowSize*8.0/1460*1500)]
-puts "Arrival: Poisson with inter-arrival [expr 1/$lambda * 1000] ms"
 
 
 
@@ -62,7 +122,6 @@ if {[string compare $sourceAlg "DD-TCP-Sack"] == 0} {
     Agent/TCP set ecnhat_ true
     Agent/TCPSink set ecnhat_ true
     Agent/TCP set ecnhat_g_ $DCTCP_g_;
-    #Agent/TCP/FullTcp set deadline 100
     set myAgent "Agent/TCP/FullTcp/Sack/DDTCP";
 }
 
@@ -70,13 +129,8 @@ if {[string compare $sourceAlg "LL-DCT-Sack"] == 0} {
     Agent/TCP set ecnhat_ true
     Agent/TCPSink set ecnhat_ true
     Agent/TCP set ecnhat_g_ $DCTCP_g_;
-    #Agent/TCP/FullTcp set deadline 100
     set myAgent "Agent/TCP/FullTcp/Sack/LLDCT";
 }
-
-
-
-
 
 
 if {[string compare $sourceAlg "DC-TCP-Sack"] == 0} {
@@ -111,13 +165,9 @@ DelayLink set avoidReordering_ true
 
 
 proc finish {} {
-    global ns enableNAM namfile mytracefile throughputfile
+    global ns
     $ns flush-trace
-    if {$enableNAM != 0} {
-        close $namfile
-        exec nam out.nam &
-    }
-	  exit 0
+	exit 0
 }
 
 
@@ -136,8 +186,11 @@ for {set i 0} {$i < $N} {incr i} {
 }
 
 
+
+
 $ns simplex-link $nswitch1 $nswitch2 [set lineRate]Gb [expr $RTT/6] $switchAlg
 $ns simplex-link $nswitch2 $nswitch1 [set lineRate]Gb [expr $RTT/6] DropTail
+
 $ns queue-limit $nswitch1 $nswitch2 $B
 
 $ns duplex-link $nswitch2 $nclient1 [set inputLineRate]Gb [expr $RTT/6] DropTail
@@ -148,19 +201,18 @@ $ns duplex-link $nswitch2 $nclient2 [set inputLineRate]Gb [expr $RTT/6] DropTail
 
 
 
+# Config for the distribution flows
+
 set flow_gen 0
 set flow_fin 0
-set flowlog [open flow.tr w]
 set init_fid 0
-set connections_per_pair 8
 set tbf 0
-set deadline_down 10000
-set deadline_up   30000 
-set sim_end 100000
+
+
 for {set i 0} {$i < $N } {incr i} {
     set agtagr($i,0) [new Agent_Aggr_pair]
+
     $agtagr($i,0) setup $n($i) $nclient2 [array get tbf] 0 "$i 0" $connections_per_pair $init_fid "TCP_pair" $deadline_down $deadline_up
-   
     $agtagr($i,0) attach-logfile $flowlog
     
     puts -nonewline "($i,0) "
@@ -173,14 +225,60 @@ for {set i 0} {$i < $N } {incr i} {
 
 
 
-$ns  trace-queue  $nswitch1 $nswitch2  $trace_file
+
+
+# Config for background flows (longlived flows)
+for {set i 0} {$i < $BackgroundFlows} {incr i} {
+    set BackgroundNodes($i) [$ns node]
+}
+
+
+for {set i 0} {$i < $BackgroundFlows} {incr i} {
+    $ns duplex-link $BackgroundNodes($i) $nswitch1 [set inputLineRate]Gb [expr $RTT/6] DropTail
+}
+
+
+
+set nclient3 [$ns node]
+$ns duplex-link $nswitch2 $nclient3 [set inputLineRate]Gb [expr $RTT/6] DropTail
+
+
+
+for {set i 0} {$i < $BackgroundFlows} {incr i} {
+  set tcps($i) [new $myAgent]  ;
+  set tcpr($i) [new $myAgent]  ;
+  $tcps($i) set fid_ [expr $i+1000000]
+  $tcpr($i) set fid_ [expr $i+1000000]
+  $ns attach-agent $BackgroundNodes($i) $tcps($i);
+  $ns attach-agent $nclient3 $tcpr($i);
+  $tcpr($i) listen
+  $ns connect $tcps($i) $tcpr($i)
+}
 
 
 
 
-#$ns at 0.0 "$tcp(0) advance-bytes 5000000" 
-#$ns at 0.0 "$tcp(1) advance-bytes 10000000" 
- 
+for {set i 0} {$i < $BackgroundFlows} {incr i} {
+    set ftp($i) [new Application/FTP]
+    $ftp($i) attach-agent $tcps($i)
+    $ftp($i) set type_ FTP
+}
+
+
+
+
+
+for {set i 0} {$i < $BackgroundFlows} {incr i} {
+    $ns at 0.0 "$ftp($i) start"
+}
+
+
+
+
+if { $TracePacketLevel == 1} {
+    $ns  trace-queue  $nswitch1 $nswitch2  $trace_file
+} 
+
                       
 $ns at $simulationTime "finish"
 

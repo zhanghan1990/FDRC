@@ -52,7 +52,7 @@ TCP_pair instproc init {args} {
     $self set pair_id  0
     $self set group_id 0
     $self set id       0
-    $self set debug_mode 1
+    $self set debug_mode 0
     $self set rttimes 0
 }
 
@@ -70,12 +70,14 @@ TCP_pair instproc setup {snode dnode deadlinedown deadlineup} {
     $self instvar san dan  ;# memorize dumbell node (to attach)
     $self instvar deadline_up deadline_down; # flow deadline range
 
-
     $self set san $snode
     $self set dan $dnode
 
-    $self set deadline_up deadlineup
-    $self set deadline_down deadlinedown
+
+    $self set deadline_up $deadlineup
+    $self set deadline_down $deadlinedown
+
+    #puts "$deadline_up $deadline_down"
 
     $ns attach-agent $snode $tcps;
     $ns attach-agent $dnode $tcpr;
@@ -170,12 +172,14 @@ TCP_pair instproc set_debug_mode { mode } {
     $self set debug_mode $mode
 }
 TCP_pair instproc start { nr_bytes } {
-    global ns sim_end flow_gen 
+    global ns sim_end flow_gen DeadlineFlowsPer
     $self instvar tcps tcpr id group_id deadline
     $self instvar start_time bytes
     $self instvar aggr_ctrl start_cbfunc 
 
     $self instvar deadline_up deadline_down
+
+    $self instvar deadlineflowsnumber
 
     $self instvar debug_mode
 
@@ -186,9 +190,9 @@ TCP_pair instproc start { nr_bytes } {
     if {$flow_gen >= $sim_end} {
 	return
     }
-    #if {$start_time >= 0.2} {
+    if {$start_time >= 0.2} {
 	set flow_gen [expr $flow_gen + 1]
-    #}
+    }
 
     if { $debug_mode == 1 } {
 	puts "stats: [$ns now] start grp $group_id fid $id $nr_bytes bytes"
@@ -210,7 +214,18 @@ TCP_pair instproc start { nr_bytes } {
     $r3    set     min_       $deadline_down
     $r3    set     max_       $deadline_up
 
-    $tcps set deadline_ [$r3 value]
+    set deadline [$r3 value]
+
+    #puts "deadline $deadline_down $deadline_up $deadline"
+
+    if {[expr $flow_gen % $DeadlineFlowsPer] == 0} {
+        $tcps set deadline_ [expr int($deadline)]
+    } else {
+        $tcps set deadline_ 0
+    }
+    #$tcps set deadline_ [expr int($deadline)]
+
+    #puts [$tcps set deadline_]
     $tcps advance-bytes $nr_bytes
     
 }
@@ -276,10 +291,10 @@ TCP_pair instproc flow_finished {} {
     set ct [$ns now]
     #Shuang commenting these
     $self set dt  [expr $ct - $start_time]
- $self set bps 0
+    $self set bps 0
     if { $dt == 0 } {
 		puts "dt = 0"
- $self set bps 0
+        $self set bps 0
 		flush stdout
 	}
    if { $dt > 0.0001 } {
@@ -605,7 +620,8 @@ Agent_Aggr_pair instproc schedule { pid } {
     $self instvar rv_flow_intval rv_nbytes
 
     if {$flow_gen >= $sim_end} {
-	return
+        puts "schedule: flowgen > sim_ends"
+	    return
     }  
  
     set t [$ns now]
@@ -680,6 +696,8 @@ Agent_Aggr_pair instproc fin_notify { pid bytes fldur bps rttimes } {
     $self instvar actfl
     $self instvar apair
 
+
+
     #Here, we re-schedule $apair($pid).
     #according to the arrival process.
 
@@ -693,12 +711,13 @@ Agent_Aggr_pair instproc fin_notify { pid bytes fldur bps rttimes } {
         set tmp_pkts [expr $bytes / 1460]
 	
 	#puts $logfile "$tmp_pkts $fldur $rttimes"
-    puts $logfile "flow_stats: [$ns now] gid $group_id pid $pid fid $fin_fid bytes $bytes fldur $fldur actfl $actfl bps $bps"
+    puts $logfile "flow_stats: [$ns now] gid $group_id pid $pid fid $fin_fid bytes $bytes fldur $fldur actfl $actfl bps $bps deadline [$apair($pid) set deadline]"
 	flush stdout
     }
     set flow_fin [expr $flow_fin + 1]
-    puts "flow finish $flow_fin"
+    #puts "flow finish $flow_fin"
     if {$flow_fin >= $sim_end} {
+        puts "fin_notify flow_fin"
 	finish
     } 
     if {$flow_gen < $sim_end} {
