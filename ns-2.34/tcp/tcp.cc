@@ -1493,7 +1493,7 @@ void TcpAgent::update_ecnhat_alpha(Packet *pkt)
 	if (!ecnhat_smooth_alpha_) 
 		ecnhat_alpha_ = (1 - ecnhat_g_) * ecnhat_alpha_ + ecnhat_g_ * ecnbit;
 	else {
-	        int acked_bytes = ackno - highest_ack_; 
+	    int acked_bytes = ackno - highest_ack_; 
 		if (acked_bytes <= 0) 
 		  acked_bytes = size_;
 		//printf("size_ = %d, acked_bytes = %d\n",size_, acked_bytes);
@@ -1505,7 +1505,6 @@ void TcpAgent::update_ecnhat_alpha(Packet *pkt)
 		        ecnhat_beta_ = 1;
 		}
 		if (ackno > ecnhat_recalc_seq) {
-			double temp_alpha;
 			ecnhat_recalc_seq = ecnhat_maxseq;
 			if (ecnhat_total > 0) { 
 				temp_alpha = ((double) ecnhat_num_marked) / ecnhat_total;

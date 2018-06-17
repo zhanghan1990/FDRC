@@ -179,7 +179,7 @@ protected:
 	double increase_num_;   /* factor for additive increase */
 	int tcpip_base_hdr_size_;  /* size of base TCP/IP header */
 	int maxcwnd_;		/* max # cwnd can ever be */
-        int numdupacks_;	/* dup ACKs before fast retransmit */
+    int numdupacks_;	/* dup ACKs before fast retransmit */
 	int numdupacksFrac_;	/* for a larger numdupacks_ with large */
 				/* windows */
 
@@ -402,6 +402,7 @@ virtual void output(int seqno, int reason = 0);
 	int ecnhat_smooth_alpha_;
 	double ecnhat_g_;
 	double ecnhat_alpha_;
+	double temp_alpha;
 	int ecnhat_recalc_seq;
 	int ecnhat_maxseq;
 	int ecnhat_num_marked;

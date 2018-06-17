@@ -364,7 +364,25 @@ class DDTcpAgent : public SackFullTcpAgent {
 };
 
 
+class KarunaTcpAgent : public SackFullTcpAgent {
 
+	// rewrite the recv window here, in the simulation code, we just change the
+	// advertise window part of the evaluation of Karuna
+	virtual void recv(Packet *pkt, Handler*);
+	// FLast     :      Last Fraction of Packets (computed according to fraction of marked packets)
+	// WLast:           Window size of last RTT (last window size)
+	// K         :      Threshold of switch
+	// C         :      Capacity of the links
+	// Z         :      diff between expected rate and aggreage rate;
+	double FLast,WLast,K,C,Z;
+
+	virtual void delay_bind_init_all();
+	virtual int delay_bind_dispatch(const char *varName, const char *localName, TclObject *tracer);
+	void update_advertised_window(Packet *pkt);
+public:
+	KarunaTcpAgent():Z(0),WLast(2),FLast(0){}
+	
+};
 
 
 #endif

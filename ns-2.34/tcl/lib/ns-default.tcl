@@ -1333,12 +1333,15 @@ if [TclObject is-class Agent/TCP/FullTcp] {
 	Agent/TCP/FullTcp/Sack set sack_rtx_bthresh_ 1; # dup bcnt to trigger rtx
 	Agent/TCP/FullTcp/Sack set sack_rtx_threshmode_ 1; # 1 = cnt only
 
-	Agent/TCP/FullTcp/Sack/LLDCT set LL_WCMIN_ 0.125; #wc lower bound, recommended by the paper
-	Agent/TCP/FullTcp/Sack/LLDCT set LL_WCMAX_ 2.5;   #wc upper bound, recommended by the paper
+	Agent/TCP/FullTcp/Sack/LLDCT set LL_WCMIN_ 0.125; # wc lower bound, recommended by the paper
+	Agent/TCP/FullTcp/Sack/LLDCT set LL_WCMAX_ 2.5;   # wc upper bound, recommended by the paper
 
-	Agent/TCP/FullTcp/Sack/LLDCT set LL_BMIN_ 250000  ;#bytes lower bound, recommended by the paper,in bytes
-	Agent/TCP/FullTcp/Sack/LLDCT set LL_BMAX_ 1000000 ;#bytes upper bound, recommended by the paper, in bytes
+	Agent/TCP/FullTcp/Sack/LLDCT set LL_BMIN_ 250000  ;# bytes lower bound, recommended by the paper,in bytes
+	Agent/TCP/FullTcp/Sack/LLDCT set LL_BMAX_ 1000000 ;# bytes upper bound, recommended by the paper, in bytes
 
+
+	Agent/TCP/FullTcp/Sack/KarunaTCP set C_ 1000 ;  # bottleneck link capacity in  MB/s
+	Agent/TCP/FullTcp/Sack/KarunaTCP set K_ 20 ;    # threshold of switch, default value is 20
 
 
 	Agent/TCP/FullTcp/Tahoe instproc init {} {
@@ -1369,6 +1372,10 @@ if [TclObject is-class Agent/TCP/FullTcp] {
 	}
 
 	Agent/TCP/FullTcp/Sack/LLDCT instproc init {} {
+		$self next
+	}
+
+	Agent/TCP/FullTcp/Sack/KarunaTCP instproc init {} {
 		$self next
 	}
 
