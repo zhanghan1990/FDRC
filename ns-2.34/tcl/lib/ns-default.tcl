@@ -1343,6 +1343,12 @@ if [TclObject is-class Agent/TCP/FullTcp] {
 	Agent/TCP/FullTcp/Sack/KarunaTCP set C_ 1000 ;  # bottleneck link capacity in  MB/s
 	Agent/TCP/FullTcp/Sack/KarunaTCP set K_ 20 ;    # threshold of switch, default value is 20
 
+	Agent/TCP/FullTcp/Sack/FDRCTCP set DMAX_  1;    				# for flows have hightest priority 
+	Agent/TCP/FullTcp/Sack/FDRCTCP set DMIN_  0.5;  				# for flows have lowest priority
+	Agent/TCP/FullTcp/Sack/FDRCTCP set Threshold_tight_  20000;     # in us, 20ms
+	Agent/TCP/FullTcp/Sack/FDRCTCP set Threshold_lax_    50000;     # in us, 50ms
+	Agent/TCP/FullTcp/Sack/FDRCTCP set D_MAX_  50000;               # in us, 30ms
+	Agent/TCP/FullTcp/Sack/FDRCTCP set F_MAX_  1000;                # in KB, 1000KB
 
 	Agent/TCP/FullTcp/Tahoe instproc init {} {
 		$self next
@@ -1376,6 +1382,10 @@ if [TclObject is-class Agent/TCP/FullTcp] {
 	}
 
 	Agent/TCP/FullTcp/Sack/KarunaTCP instproc init {} {
+		$self next
+	}
+
+	Agent/TCP/FullTcp/Sack/FDRCTCP instproc init {} {
 		$self next
 	}
 

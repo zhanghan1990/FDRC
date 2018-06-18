@@ -383,6 +383,15 @@ public:
 	KarunaTcpAgent():Z(0),WLast(2),FLast(0){}
 	
 };
-
-
+class FDRCTcpAgent : public SackFullTcpAgent {
+	virtual void delay_bind_init_all();
+	virtual int delay_bind_dispatch(const char *varName, const char *localName, TclObject *tracer);
+	
+	virtual void slowdown(int how);			/* reduce cwnd/ssthresh */
+	//virtual void opencwnd();
+	virtual int byterm();
+	virtual int foutput(int seqno, int reason = 0); // output 1 packet
+	virtual int need_send();    		// send ACK/win-update now?
+	double DMIN,DMAX,Threshold_tight,Threshold_lax,D_MAX,F_MAX;
+};
 #endif
