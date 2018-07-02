@@ -386,12 +386,26 @@ public:
 class FDRCTcpAgent : public SackFullTcpAgent {
 	virtual void delay_bind_init_all();
 	virtual int delay_bind_dispatch(const char *varName, const char *localName, TclObject *tracer);
-	
+
 	virtual void slowdown(int how);			/* reduce cwnd/ssthresh */
-	//virtual void opencwnd();
+	virtual void opencwnd();
 	virtual int byterm();
 	virtual int foutput(int seqno, int reason = 0); // output 1 packet
 	virtual int need_send();    		// send ACK/win-update now?
 	double DMIN,DMAX,Threshold_tight,Threshold_lax,D_MAX,F_MAX;
 };
+
+// DA&FD rate control
+class DAFDTcpAgent : public SackFullTcpAgent {
+	virtual void delay_bind_init_all();
+	virtual int delay_bind_dispatch(const char *varName, const char *localName, TclObject *tracer);
+
+	virtual void slowdown(int how);			/* reduce cwnd/ssthresh */
+	virtual void opencwnd();
+	virtual int byterm();
+	virtual int foutput(int seqno, int reason = 0); // output 1 packet
+	virtual int need_send();    		// send ACK/win-update now?
+	double T;                          //T is the time we want to control
+};
+
 #endif

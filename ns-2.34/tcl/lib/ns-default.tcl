@@ -1350,6 +1350,10 @@ if [TclObject is-class Agent/TCP/FullTcp] {
 	Agent/TCP/FullTcp/Sack/FDRCTCP set D_MAX_  50000;               # in us, 30ms
 	Agent/TCP/FullTcp/Sack/FDRCTCP set F_MAX_  1000;                # in KB, 1000KB
 
+
+
+	Agent/TCP/FullTcp/Sack/DAFDTCP set C_  100;               		# bottleneck link capacity in ms
+
 	Agent/TCP/FullTcp/Tahoe instproc init {} {
 		$self next
 		$self instvar reno_fastrecov_
@@ -1386,6 +1390,10 @@ if [TclObject is-class Agent/TCP/FullTcp] {
 	}
 
 	Agent/TCP/FullTcp/Sack/FDRCTCP instproc init {} {
+		$self next
+	}
+
+	Agent/TCP/FullTcp/Sack/DAFDTCP instproc init {} {
 		$self next
 	}
 
