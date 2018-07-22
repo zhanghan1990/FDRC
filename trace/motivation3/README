@@ -1,0 +1,7 @@
+This trace describes Figure 1 of the paper. simpleDumbbell.tcl is the experiment trace.
+simpleDumbell needs 4 parameters.
+one example of this trace is:
+ns simpleDumbbell.tcl DD-TCP-Sack 8 0.5 1 0.1, where DD-TCP-Sack means use D2TCP, 8 means there is 8 nodes to send traffic,
+0.5 means there are 50% flows have deadline, 1 means there is 1 background flow.
+0.1 means traffic load is 10%
+

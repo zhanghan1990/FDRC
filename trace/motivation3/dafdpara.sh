@@ -1,0 +1,10 @@
+ns dafdpara.tcl DAFD-TCP-Sack 8 0.5 1 20
+ns dafdpara.tcl DAFD-TCP-Sack 8 0.5 1 40
+ns dafdpara.tcl DAFD-TCP-Sack 8 0.5 1 60
+ns dafdpara.tcl DAFD-TCP-Sack 8 0.5 1 80
+ns dafdpara.tcl DAFD-TCP-Sack 8 0.5 1 100
+ns dafdpara.tcl DAFD-TCP-Sack 8 0.5 1 120
+ns dafdpara.tcl DAFD-TCP-Sack 8 0.5 1 140
+ns dafdpara.tcl DAFD-TCP-Sack 8 0.5 1 160
+ns dafdpara.tcl DAFD-TCP-Sack 8 0.5 1 180
+ns dafdpara.tcl DAFD-TCP-Sack 8 0.5 1 200
